@@ -3,16 +3,22 @@
 import psycopg2
 import sqlalchemy
 import yaml
-from sqlalchemy import engine, create_engine
+from sqlalchemy import engine, create_engine, MetaData
 
 class DatabaseConnector:
     '''Upload and connect to the database'''
 
-    def read_db_creds(self, file_path):
+    def __init__(self, file_path) -> None:
+        '''Initialise with credentials file path'''
+
+        self.file_path = file_path
+        self.engine = self.init_db_engine()
+
+    def read_db_creds(self):
         '''Reads and returns dictionary of credentials'''
         
         try:
-            with open(file_path, 'r') as file:
+            with open(self.file_path, 'r') as file:
                 creds = yaml.safe_load(file)
             return creds
         except FileNotFoundError:
@@ -22,11 +28,11 @@ class DatabaseConnector:
             print("Error parsing YAML:", e)
             return {}
         
-    def init_db_engine(self, file_path):
+    def init_db_engine(self):
         '''Reads credentials and returns SQLAlchemy database engine'''
 
         # Read credentials
-        creds = self.read_db_creds(file_path)
+        creds = self.read_db_creds()
 
         # Construct database URL
         db_url = f"postgresql://{creds['RDS_USER']}:{creds['RDS_PASSWORD']}@{creds['RDS_HOST']}:{creds['RDS_PORT']}/{creds['RDS_DATABASE']}"
@@ -39,20 +45,26 @@ class DatabaseConnector:
             with engine.connect():
                 pass
         except Exception as e:
-            print("Error creating engin:", e)
+            print("Error creating engine:", e)
             return None
 
         return engine
+    
+    def list_db_tables(self):
+        '''List all tables in the database'''
+
+        if self.engine is None:
+            print("Engine not initializes")
+            return[]
+        
+        try:
+            metadata = MetaData(bind=self.engine)
+            metadata.reflect()
+            return metadata.tables.keys()
+        except Exception as e:
+            print("Error listing tables:", e)
+            return []
 
 
 
-if __name__ == "__main__":
-
-    db_connector = DatabaseConnector()        
-    engine = db_connector.init_db_engine('db_creds.yaml')
-    print(engine)
-
-    if engine:
-        print("Engine created successfully:", engine)
-    else:
-        print("Failed to create engine") 
+# End of file
